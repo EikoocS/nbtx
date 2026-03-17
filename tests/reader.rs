@@ -1,0 +1,71 @@
+use nbtx::{NbtComponent, PlatformType, Reader};
+use std::io::{BufReader, Cursor};
+
+macro_rules! assert_nbt {
+    ($expr:expr, $name:expr, $expected:expr) => {{
+        let entry = $expr.expect("failed to read nbt entry");
+
+        assert_eq!(entry.0, $name);
+        assert_eq!(entry.1, $expected);
+    }};
+}
+
+#[test]
+fn nbt_reader() {
+    let data_je: [u8; _] = [
+        // **HEAD**
+        0x0a, 0x00, 0x00, // Int SpawnX : 23456
+        0x03, 0x00, 0x06, 0x53, 0x70, 0x61, 0x77, 0x6E, 0x58, 0x00, 0x00, 0x5b, 0xa0,
+        // String Name : Notch
+        0x08, 0x00, 0x04, 0x4e, 0x61, 0x6d, 0x65, 0x00, 0x05, 0x4e, 0x6f, 0x74, 0x63, 0x68,
+        // Float An_Example : 1.325
+        0x05, 0x00, 0x0a, 0x41, 0x6E, 0x5F, 0x45, 0x78, 0x61, 0x6D, 0x70, 0x6C, 0x65, 0x3f, 0xa9,
+        0x99, 0x9a, // Int_Array Chunk [ 384 , 754 ]
+        0x0b, 0x00, 0x05, 0x43, 0x68, 0x75, 0x6E, 0x6B, 0x00, 0x00, 0x00, 0x02, 0x00, 0x00, 0x01,
+        0x80, 0x00, 0x00, 0x02, 0xf2, // List NameList [Steve, Alex, Noob]
+        0x09, 0x00, 0x08, 0x4e, 0x61, 0x6d, 0x65, 0x4c, 0x69, 0x73, 0x74, 0x08, 0x00, 0x00, 0x00,
+        0x03, 0x00, 0x05, 0x53, 0x74, 0x65, 0x76, 0x65, 0x00, 0x04, 0x41, 0x6c, 0x65, 0x78, 0x00,
+        0x04, 0x4e, 0x6f, 0x6f, 0x62, // Compound **HEAD**  Rank
+        0x0a, 0x00, 0x04, 0x52, 0x61, 0x6E, 0x6B, // String Winner : Steve
+        0x08, 0x00, 0x06, 0x57, 0x69, 0x6E, 0x6E, 0x65, 0x72, 0x00, 0x05, 0x53, 0x74, 0x65, 0x76,
+        0x65, // Short Count : 31
+        0x02, 0x00, 0x05, 0x43, 0x6F, 0x75, 0x6E, 0x74, 0x00, 0x1f, // **END**
+        0x00, // **END
+        0x00,
+    ];
+
+    let readable = Cursor::new(data_je);
+    let readable = BufReader::new(readable);
+    let mut reader = Reader::new(Box::new(readable), PlatformType::JavaEdition);
+    assert_nbt!(reader.next(), "SpawnX", NbtComponent::Int(23456));
+    assert_nbt!(reader.next(), "Name", NbtComponent::String("Notch".into()));
+    assert_nbt!(reader.next(), "An_Example", NbtComponent::Float(1.325));
+    assert_nbt!(
+        reader.next(),
+        "Chunk",
+        NbtComponent::IntArray(vec![384, 754])
+    );
+    assert_nbt!(
+        reader.next(),
+        "NameList[0]",
+        NbtComponent::String("Steve".into())
+    );
+    assert_nbt!(
+        reader.next(),
+        "NameList[1]",
+        NbtComponent::String("Alex".into())
+    );
+    assert_nbt!(
+        reader.next(),
+        "NameList[2]",
+        NbtComponent::String("Noob".into())
+    );
+    assert_nbt!(
+        reader.next(),
+        "Rank.Winner",
+        NbtComponent::String("Steve".into())
+    );
+    assert_nbt!(reader.next(), "Rank.Count", NbtComponent::Short(31));
+    assert!(!reader.has_next());
+    assert!(reader.next().is_err());
+}

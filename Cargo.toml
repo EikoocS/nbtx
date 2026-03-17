@@ -1,0 +1,10 @@
+[package]
+name = "nbtx"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+flate2 = "1"
+byteorder = "1"
+cesu8 = "1.1.0"
+clap = { version = "4", features = ["derive"] }
