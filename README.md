@@ -50,41 +50,14 @@ cargo run -- <file> <path> --platform bedrock
 
 ## Library Quick Start
 
-```rust
-use nbtx::{PlatformType, Reader};
+Runnable examples are provided in `examples/`:
 
-fn main() {
-    let mut reader = Reader::try_new_with_path("level.dat", PlatformType::JavaEdition)
-        .expect("failed to open NBT file");
+```bash
+# Reader example (prints flattened paths and values)
+cargo run --example reader -- level.dat
 
-    while reader.has_next() {
-        let (path, value) = reader.next().expect("failed to read NBT entry");
-        println!("{}: {:?}", path, value);
-    }
-}
-```
-
-```rust
-use nbtx::{NbtComponent, PlatformType, RootType, Writer};
-
-fn main() {
-    let sink: Vec<u8> = Vec::new();
-    let mut writer = Writer::try_new(
-        Box::new(std::io::Cursor::new(sink)),
-        PlatformType::JavaEdition,
-        RootType::Compound,
-    )
-    .expect("failed to initialize writer");
-
-    writer
-        .write("Name", NbtComponent::String("Notch".to_string()))
-        .expect("failed to write Name");
-    writer
-        .write("Score", NbtComponent::Int(42))
-        .expect("failed to write Score");
-    writer.end().expect("failed to end root compound");
-    writer.finish().expect("failed to finalize document");
-}
+# Writer example (creates a simple in-memory NBT document)
+cargo run --example writer
 ```
 
 ## License
