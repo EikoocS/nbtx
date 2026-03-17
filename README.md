@@ -2,7 +2,7 @@
 
 `nbtx` is a Rust project for reading and writing Minecraft NBT data (Java Edition and Bedrock Edition).
 
-Chinese README: `README_CN.md`
+中文版 [README](./README_CN.md)
 
 ## Features
 

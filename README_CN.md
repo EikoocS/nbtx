@@ -2,7 +2,7 @@
 
 `nbtx` 是一个用于读取和写入 Minecraft NBT 数据的 Rust 项目，支持 Java 版和 Bedrock 版。
 
-English README: `README.md`
+English [README](./README.md)
 
 ## 功能
 
