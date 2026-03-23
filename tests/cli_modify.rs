@@ -1,4 +1,4 @@
-use nbtx::{NbtComponent, PlatformType, Reader, RootType, Writer};
+use nbtx::{tag_id, NbtComponent, PlatformType, Reader, RootType, Writer};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::PathBuf;
@@ -27,7 +27,7 @@ fn write_sample_file(path: &PathBuf) {
         .write(
             "items",
             NbtComponent::List {
-                id: 0x0a,
+                id: tag_id::COMPOUND,
                 length: 3,
             },
         )

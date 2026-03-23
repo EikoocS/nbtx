@@ -2,7 +2,7 @@ use clap::{Parser, ValueEnum};
 use flate2::Compression as FlateCompression;
 use nbtx::decoder::{NbtDecoder, build as build_decoder};
 use nbtx::encoder::{NbtEncoder, build as build_encoder};
-use nbtx::{NbtComponent, ParseError, PlatformType, Reader};
+use nbtx::{tag_id, NbtComponent, ParseError, PlatformType, Reader};
 use regex::Regex;
 use std::collections::BTreeMap;
 use std::fs::File;
@@ -202,15 +202,15 @@ fn create_write_stream(
 
 fn parse_value_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtValue, ParseError> {
     match id {
-        0x01 => Ok(NbtValue::Byte(decoder.read_byte()?)),
-        0x02 => Ok(NbtValue::Short(decoder.read_short()?)),
-        0x03 => Ok(NbtValue::Int(decoder.read_int()?)),
-        0x04 => Ok(NbtValue::Long(decoder.read_long()?)),
-        0x05 => Ok(NbtValue::Float(decoder.read_float()?)),
-        0x06 => Ok(NbtValue::Double(decoder.read_double()?)),
-        0x07 => Ok(NbtValue::ByteArray(decoder.read_byte_array()?)),
-        0x08 => Ok(NbtValue::String(decoder.read_string()?)),
-        0x09 => {
+        tag_id::BYTE => Ok(NbtValue::Byte(decoder.read_byte()?)),
+        tag_id::SHORT => Ok(NbtValue::Short(decoder.read_short()?)),
+        tag_id::INT => Ok(NbtValue::Int(decoder.read_int()?)),
+        tag_id::LONG => Ok(NbtValue::Long(decoder.read_long()?)),
+        tag_id::FLOAT => Ok(NbtValue::Float(decoder.read_float()?)),
+        tag_id::DOUBLE => Ok(NbtValue::Double(decoder.read_double()?)),
+        tag_id::BYTE_ARRAY => Ok(NbtValue::ByteArray(decoder.read_byte_array()?)),
+        tag_id::STRING => Ok(NbtValue::String(decoder.read_string()?)),
+        tag_id::LIST => {
             let list_id = decoder.read_id()?;
             let length = decoder.read_int()?;
             if length < 0 {
@@ -227,11 +227,11 @@ fn parse_value_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtValue, P
                 elements,
             })
         }
-        0x0a => {
+        tag_id::COMPOUND => {
             let mut fields = Vec::new();
             loop {
                 let field_id = decoder.read_id()?;
-                if field_id == 0x00 {
+                if field_id == tag_id::END {
                     break;
                 }
                 let tag = decoder.read_tag()?;
@@ -240,8 +240,8 @@ fn parse_value_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtValue, P
             }
             Ok(NbtValue::Compound(fields))
         }
-        0x0b => Ok(NbtValue::IntArray(decoder.read_int_array()?)),
-        0x0c => Ok(NbtValue::LongArray(decoder.read_long_array()?)),
+        tag_id::INT_ARRAY => Ok(NbtValue::IntArray(decoder.read_int_array()?)),
+        tag_id::LONG_ARRAY => Ok(NbtValue::LongArray(decoder.read_long_array()?)),
         _ => Err(ParseError::UnsupportedTagId(id)),
     }
 }
@@ -253,25 +253,25 @@ fn parse_document(path: &str, platform: PlatformType) -> Result<NbtValue, ParseE
     let root_id = decoder.read_id()?;
     let _root_tag = decoder.read_tag()?;
     match root_id {
-        0x09 | 0x0a => parse_value_by_id(root_id, &mut *decoder),
+        tag_id::LIST | tag_id::COMPOUND => parse_value_by_id(root_id, &mut *decoder),
         _ => Err(ParseError::InvalidRootTag(root_id)),
     }
 }
 
 fn component_id(value: &NbtValue) -> u8 {
     match value {
-        NbtValue::Byte(_) => 0x01,
-        NbtValue::Short(_) => 0x02,
-        NbtValue::Int(_) => 0x03,
-        NbtValue::Long(_) => 0x04,
-        NbtValue::Float(_) => 0x05,
-        NbtValue::Double(_) => 0x06,
-        NbtValue::ByteArray(_) => 0x07,
-        NbtValue::String(_) => 0x08,
-        NbtValue::List { .. } => 0x09,
-        NbtValue::Compound(_) => 0x0a,
-        NbtValue::IntArray(_) => 0x0b,
-        NbtValue::LongArray(_) => 0x0c,
+        NbtValue::Byte(_) => tag_id::BYTE,
+        NbtValue::Short(_) => tag_id::SHORT,
+        NbtValue::Int(_) => tag_id::INT,
+        NbtValue::Long(_) => tag_id::LONG,
+        NbtValue::Float(_) => tag_id::FLOAT,
+        NbtValue::Double(_) => tag_id::DOUBLE,
+        NbtValue::ByteArray(_) => tag_id::BYTE_ARRAY,
+        NbtValue::String(_) => tag_id::STRING,
+        NbtValue::List { .. } => tag_id::LIST,
+        NbtValue::Compound(_) => tag_id::COMPOUND,
+        NbtValue::IntArray(_) => tag_id::INT_ARRAY,
+        NbtValue::LongArray(_) => tag_id::LONG_ARRAY,
     }
 }
 
@@ -322,7 +322,7 @@ fn write_value(
             for (name, value) in fields {
                 write_value(encoder, name, value, false)?;
             }
-            encoder.write_id(0x00)?;
+            encoder.write_id(tag_id::END)?;
         }
     }
 
@@ -340,12 +340,12 @@ fn write_document(
 
     match value {
         NbtValue::Compound(fields) => {
-            encoder.write_id(0x0a)?;
+            encoder.write_id(tag_id::COMPOUND)?;
             encoder.write_tag("")?;
             for (name, value) in fields {
                 write_value(&mut *encoder, name, value, false)?;
             }
-            encoder.write_id(0x00)?;
+            encoder.write_id(tag_id::END)?;
         }
         NbtValue::List { id, elements } => {
             if elements.len() > i32::MAX as usize {
@@ -355,7 +355,7 @@ fn write_document(
                 )));
             }
 
-            encoder.write_id(0x09)?;
+            encoder.write_id(tag_id::LIST)?;
             encoder.write_tag("")?;
             encoder.write_id(*id)?;
             encoder.write_int(elements.len() as i32)?;
@@ -625,7 +625,7 @@ fn delete_paths(value: &mut NbtValue, paths: Vec<Vec<PathSegment>>) -> Result<us
                 }
 
                 if elements.is_empty() {
-                    *id = 0x00;
+                    *id = tag_id::END;
                 }
             }
             _ => {
@@ -1018,8 +1018,8 @@ fn infer_list_element_id(tail: &[PathSegment], new_value: &NbtValue) -> u8 {
     }
 
     match tail[0] {
-        PathSegment::Field(_) => 0x0a,
-        PathSegment::Index(_) => 0x09,
+        PathSegment::Field(_) => tag_id::COMPOUND,
+        PathSegment::Index(_) => tag_id::LIST,
     }
 }
 
@@ -1034,7 +1034,7 @@ fn make_intermediate_value(path_tail: &[PathSegment], new_value: &NbtValue) -> N
 }
 
 fn ensure_list_id(id: &mut u8, elements: &[NbtValue], expected: u8) -> Result<(), String> {
-    if *id == 0x00 && elements.is_empty() {
+    if *id == tag_id::END && elements.is_empty() {
         *id = expected;
         return Ok(());
     }
@@ -1274,7 +1274,7 @@ fn run_delete(args: &Args, platform: PlatformType) -> std::io::Result<()> {
             });
             deleted += before.saturating_sub(elements.len());
             if elements.is_empty() {
-                *id = 0x00;
+                    *id = tag_id::END;
             }
         }
 

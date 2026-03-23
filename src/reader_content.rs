@@ -1,10 +1,11 @@
 use crate::decoder::NbtDecoder;
 use crate::{NbtComponent, ParseError};
+use crate::tag_id;
 
 pub trait Content {
     fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError>;
     fn has_next(&self) -> bool;
-    fn format(&self) -> String;
+    fn format(&self) -> &str;
 }
 
 pub struct ListContent {
@@ -37,8 +38,8 @@ impl Content for ListContent {
         self.index < self.length
     }
 
-    fn format(&self) -> String {
-        self.tag.clone()
+    fn format(&self) -> &str {
+        &self.tag
     }
 }
 
@@ -58,7 +59,7 @@ impl ComponentContent {
 impl Content for ComponentContent {
     fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError> {
         let id = decoder.read_id()?;
-        if id == 0x00 {
+        if id == tag_id::END {
             self.has_next = false;
             return Ok((String::new(), NbtComponent::End));
         }
@@ -71,26 +72,26 @@ impl Content for ComponentContent {
         self.has_next
     }
 
-    fn format(&self) -> String {
-        self.tag.clone()
+    fn format(&self) -> &str {
+        &self.tag
     }
 }
 
 fn next_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtComponent, ParseError> {
     match id {
-        0x00 => Ok(NbtComponent::End),
-        0x01 => Ok(decoder.read_byte()?.into()),
-        0x02 => Ok(decoder.read_short()?.into()),
-        0x03 => Ok(decoder.read_int()?.into()),
-        0x04 => Ok(decoder.read_long()?.into()),
-        0x05 => Ok(decoder.read_float()?.into()),
-        0x06 => Ok(decoder.read_double()?.into()),
-        0x07 => Ok(decoder.read_byte_array()?.into()),
-        0x08 => Ok(decoder.read_string()?.into()),
-        0x09 => Ok((decoder.read_id()?, decoder.read_int()?).into()),
-        0x0a => Ok(NbtComponent::Compound),
-        0x0b => Ok(decoder.read_int_array()?.into()),
-        0x0c => Ok(decoder.read_long_array()?.into()),
+        tag_id::END => Ok(NbtComponent::End),
+        tag_id::BYTE => Ok(decoder.read_byte()?.into()),
+        tag_id::SHORT => Ok(decoder.read_short()?.into()),
+        tag_id::INT => Ok(decoder.read_int()?.into()),
+        tag_id::LONG => Ok(decoder.read_long()?.into()),
+        tag_id::FLOAT => Ok(decoder.read_float()?.into()),
+        tag_id::DOUBLE => Ok(decoder.read_double()?.into()),
+        tag_id::BYTE_ARRAY => Ok(decoder.read_byte_array()?.into()),
+        tag_id::STRING => Ok(decoder.read_string()?.into()),
+        tag_id::LIST => Ok((decoder.read_id()?, decoder.read_int()?).into()),
+        tag_id::COMPOUND => Ok(NbtComponent::Compound),
+        tag_id::INT_ARRAY => Ok(decoder.read_int_array()?.into()),
+        tag_id::LONG_ARRAY => Ok(decoder.read_long_array()?.into()),
         _ => Err(ParseError::UnsupportedTagId(id)),
     }
 }

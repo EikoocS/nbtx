@@ -11,6 +11,7 @@ mod reader;
 mod reader_content;
 mod util;
 mod writer;
+pub mod tag_id;
 
 /// NBT value variants returned by [`Reader`].
 pub use component::NbtComponent;

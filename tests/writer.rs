@@ -1,4 +1,4 @@
-use nbtx::{NbtComponent, PlatformType, RootType, Writer};
+use nbtx::{tag_id, NbtComponent, PlatformType, RootType, Writer};
 use std::cell::RefCell;
 use std::io::Write;
 use std::rc::Rc;
@@ -70,7 +70,7 @@ fn nbt_writer() {
         .write(
             "NameList",
             NbtComponent::List {
-                id: 0x08,
+                id: tag_id::STRING,
                 length: 3,
             },
         )
@@ -101,3 +101,44 @@ fn nbt_writer() {
     let actual = output.borrow().clone();
     assert_eq!(actual, expected);
 }
+
+#[test]
+fn writer_empty_root_list_is_finished() {
+    let output = Rc::new(RefCell::new(Vec::new()));
+    let sink = SharedBuffer {
+        inner: Rc::clone(&output),
+    };
+
+    let mut writer = Writer::try_new(
+        Box::new(sink),
+        PlatformType::JavaEdition,
+        RootType::List {
+            id: tag_id::STRING,
+            length: 0,
+        },
+    )
+    .expect("failed to initialize writer");
+
+    assert!(writer.is_finished());
+    writer.finish().expect("failed to finish empty root list");
+}
+
+#[test]
+fn writer_rejects_tag_end_value() {
+    let output = Rc::new(RefCell::new(Vec::new()));
+    let sink = SharedBuffer {
+        inner: Rc::clone(&output),
+    };
+
+    let mut writer = Writer::new(
+        Box::new(sink),
+        PlatformType::JavaEdition,
+        RootType::Compound,
+    );
+
+    let error = writer
+        .write("bad", NbtComponent::End)
+        .expect_err("expected TAG_End to be rejected");
+    assert_eq!(error.to_string(), "TAG_End cannot be written as a value");
+}
+

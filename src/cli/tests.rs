@@ -2,7 +2,7 @@ use super::*;
 
 fn sample_list_of_compounds() -> NbtValue {
     NbtValue::List {
-        id: 0x0a,
+        id: tag_id::COMPOUND,
         elements: vec![
             NbtValue::Compound(vec![
                 ("id".to_string(), NbtValue::Int(123)),
@@ -29,7 +29,7 @@ fn regex_selector_matches_multiple_paths() {
     let doc = NbtValue::Compound(vec![(
         "root".to_string(),
         NbtValue::List {
-            id: 0x0a,
+            id: tag_id::COMPOUND,
             elements: vec![
                 NbtValue::Compound(vec![("id".to_string(), NbtValue::Int(1))]),
                 NbtValue::Compound(vec![("id".to_string(), NbtValue::Int(2))]),
