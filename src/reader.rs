@@ -1,8 +1,8 @@
 use crate::component::NbtComponent;
-use crate::decoder::{NbtDecoder, build};
+use crate::decoder::{build, Decoder};
 use crate::error::ParseError;
 use crate::util::open_read_stream;
-use crate::{PlatformType, tag_id};
+use crate::{tag_id, PlatformType};
 use std::io::Read;
 
 /// Streaming NBT reader that yields flattened leaf values.
@@ -10,7 +10,7 @@ use std::io::Read;
 /// Each call to [`Reader::next`] returns a `(path, value)` pair, where `path`
 /// is a dotted path with list indices (for example `foo.bar[0].name`).
 pub struct Reader {
-    decoder: Box<dyn NbtDecoder>,
+    decoder: Decoder,
     stack: Vec<Box<dyn Content>>,
     next: Option<(String, NbtComponent)>,
 }
@@ -132,7 +132,7 @@ impl Reader {
                 return Ok(());
             };
 
-            let (tag, component) = content.next(&mut *self.decoder)?;
+            let (tag, component) = content.next(&mut self.decoder)?;
 
             match &component {
                 NbtComponent::End => {
@@ -163,7 +163,7 @@ impl Reader {
 }
 
 trait Content {
-    fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError>;
+    fn next(&mut self, decoder: &mut Decoder) -> Result<(String, NbtComponent), ParseError>;
     fn has_next(&self) -> bool;
     fn format(&self) -> &str;
 }
@@ -187,7 +187,7 @@ impl ListContent {
 }
 
 impl Content for ListContent {
-    fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError> {
+    fn next(&mut self, decoder: &mut Decoder) -> Result<(String, NbtComponent), ParseError> {
         let component = next_by_id(self.id, decoder)?;
         let tag = format!("[{}]", self.index);
         self.index += 1;
@@ -217,7 +217,7 @@ impl ComponentContent {
     }
 }
 impl Content for ComponentContent {
-    fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError> {
+    fn next(&mut self, decoder: &mut Decoder) -> Result<(String, NbtComponent), ParseError> {
         let id = decoder.read_id()?;
         if id == tag_id::END {
             self.has_next = false;
@@ -237,7 +237,7 @@ impl Content for ComponentContent {
     }
 }
 
-fn next_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtComponent, ParseError> {
+fn next_by_id(id: u8, decoder: &mut Decoder) -> Result<NbtComponent, ParseError> {
     match id {
         tag_id::END => Ok(NbtComponent::End),
         tag_id::BYTE => Ok(decoder.read_byte()?.into()),

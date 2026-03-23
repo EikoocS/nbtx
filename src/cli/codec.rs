@@ -1,8 +1,8 @@
 use crate::cli::model::{CompressionType, NbtValue};
 use flate2::Compression as FlateCompression;
-use nbtx::decoder::{NbtDecoder, build as build_decoder};
-use nbtx::encoder::{NbtEncoder, build as build_encoder};
-use nbtx::{NbtComponent, ParseError, PlatformType, tag_id};
+use nbtx::decoder::{build as build_decoder, Decoder};
+use nbtx::encoder::{build as build_encoder, Encoder};
+use nbtx::{tag_id, NbtComponent, ParseError, PlatformType};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 
@@ -91,7 +91,7 @@ fn create_write_stream(
     Ok(stream)
 }
 
-fn parse_value_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtValue, ParseError> {
+fn parse_value_by_id(id: u8, decoder: &mut Decoder) -> Result<NbtValue, ParseError> {
     match id {
         tag_id::BYTE => Ok(NbtValue::Byte(decoder.read_byte()?)),
         tag_id::SHORT => Ok(NbtValue::Short(decoder.read_short()?)),
@@ -144,7 +144,7 @@ pub(super) fn parse_document(path: &str, platform: PlatformType) -> Result<NbtVa
     let root_id = decoder.read_id()?;
     let _root_tag = decoder.read_tag()?;
     match root_id {
-        tag_id::LIST | tag_id::COMPOUND => parse_value_by_id(root_id, &mut *decoder),
+        tag_id::LIST | tag_id::COMPOUND => parse_value_by_id(root_id, &mut decoder),
         _ => Err(ParseError::InvalidRootTag(root_id)),
     }
 }
@@ -167,7 +167,7 @@ pub(super) fn component_id(value: &NbtValue) -> u8 {
 }
 
 fn write_value(
-    encoder: &mut dyn NbtEncoder,
+    encoder: &mut Encoder,
     tag: &str,
     value: &NbtValue,
     in_list: bool,
@@ -201,7 +201,7 @@ fn write_value(
 }
 
 fn write_list_payload(
-    encoder: &mut dyn NbtEncoder,
+    encoder: &mut Encoder,
     id: u8,
     elements: &[NbtValue],
 ) -> Result<(), ParseError> {
@@ -242,14 +242,14 @@ pub(super) fn write_document(
             encoder.write_id(tag_id::COMPOUND)?;
             encoder.write_tag("")?;
             for (name, value) in fields {
-                write_value(&mut *encoder, name, value, false)?;
+                write_value(&mut encoder, name, value, false)?;
             }
             encoder.write_id(tag_id::END)?;
         }
         NbtValue::List { id, elements } => {
             encoder.write_id(tag_id::LIST)?;
             encoder.write_tag("")?;
-            write_list_payload(&mut *encoder, *id, elements)?;
+            write_list_payload(&mut encoder, *id, elements)?;
         }
         _ => {
             return Err(ParseError::Other(

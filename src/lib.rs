@@ -1,11 +1,9 @@
 //! Streaming NBT parser for Java and Bedrock editions.
 
-mod bedrock;
 mod component;
 pub mod decoder;
 pub mod encoder;
 mod error;
-mod java;
 mod platform;
 mod reader;
 pub mod tag_id;

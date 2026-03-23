@@ -1,7 +1,7 @@
 use crate::component::NbtComponent;
-use crate::encoder::{NbtEncoder, build};
+use crate::encoder::{build, Encoder};
 use crate::error::ParseError;
-use crate::{PlatformType, tag_id};
+use crate::{tag_id, PlatformType};
 use std::io::Write;
 
 /// Root type used to initialize a streaming NBT writer.
@@ -22,7 +22,7 @@ enum Scope {
 /// The writer emits a valid NBT document incrementally while maintaining
 /// container state internally.
 pub struct Writer {
-    encoder: Box<dyn NbtEncoder>,
+    encoder: Encoder,
     stack: Vec<Scope>,
 }
 
