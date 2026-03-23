@@ -1,8 +1,8 @@
 use crate::component::NbtComponent;
-use crate::decoder::{build, NbtDecoder};
+use crate::decoder::{NbtDecoder, build};
 use crate::error::ParseError;
 use crate::util::open_read_stream;
-use crate::{tag_id, PlatformType};
+use crate::{PlatformType, tag_id};
 use std::io::Read;
 
 /// Streaming NBT reader that yields flattened leaf values.
@@ -79,7 +79,8 @@ impl Reader {
                 self.stack.push(Box::new(ComponentContent::new(tag)));
             }
             NbtComponent::List { id, length } if *length > 0 => {
-                self.stack.push(Box::new(ListContent::new(tag, *id, *length)));
+                self.stack
+                    .push(Box::new(ListContent::new(tag, *id, *length)));
             }
             _ => {}
         }
@@ -137,7 +138,9 @@ impl Reader {
                 NbtComponent::End => {
                     self.pop_until_has_next();
                 }
-                NbtComponent::Compound | NbtComponent::List { .. } => self.push_nested_content(tag, &component),
+                NbtComponent::Compound | NbtComponent::List { .. } => {
+                    self.push_nested_content(tag, &component)
+                }
                 _ => {
                     let path = self.path(&tag);
                     self.pop_until_has_next();
@@ -252,4 +255,3 @@ fn next_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtComponent, Pars
         _ => Err(ParseError::UnsupportedTagId(id)),
     }
 }
-

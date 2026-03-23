@@ -8,9 +8,9 @@ mod error;
 mod java;
 mod platform;
 mod reader;
+pub mod tag_id;
 mod util;
 mod writer;
-pub mod tag_id;
 
 /// NBT value variants returned by [`Reader`].
 pub use component::NbtComponent;

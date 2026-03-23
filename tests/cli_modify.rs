@@ -1,4 +1,4 @@
-use nbtx::{tag_id, NbtComponent, PlatformType, Reader, RootType, Writer};
+use nbtx::{NbtComponent, PlatformType, Reader, RootType, Writer, tag_id};
 use std::collections::BTreeMap;
 use std::fs::File;
 use std::path::PathBuf;

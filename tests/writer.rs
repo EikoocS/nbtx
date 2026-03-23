@@ -1,4 +1,4 @@
-use nbtx::{tag_id, NbtComponent, PlatformType, RootType, Writer};
+use nbtx::{NbtComponent, PlatformType, RootType, Writer, tag_id};
 use std::cell::RefCell;
 use std::io::Write;
 use std::rc::Rc;
@@ -141,4 +141,3 @@ fn writer_rejects_tag_end_value() {
         .expect_err("expected TAG_End to be rejected");
     assert_eq!(error.to_string(), "TAG_End cannot be written as a value");
 }
-

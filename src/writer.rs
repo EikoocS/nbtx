@@ -1,7 +1,7 @@
 use crate::component::NbtComponent;
-use crate::encoder::{build, NbtEncoder};
+use crate::encoder::{NbtEncoder, build};
 use crate::error::ParseError;
-use crate::{tag_id, PlatformType};
+use crate::{PlatformType, tag_id};
 use std::io::Write;
 
 /// Root type used to initialize a streaming NBT writer.
@@ -182,10 +182,7 @@ impl Writer {
     pub fn end(&mut self) -> Result<(), ParseError> {
         self.pop_completed_lists();
 
-        let scope = self
-            .stack
-            .pop()
-            .ok_or_else(Self::writer_finished_error)?;
+        let scope = self.stack.pop().ok_or_else(Self::writer_finished_error)?;
 
         match scope {
             Scope::Compound => {
