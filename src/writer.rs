@@ -1,7 +1,7 @@
 use crate::component::NbtComponent;
 use crate::encoder::{build, NbtEncoder};
 use crate::error::ParseError;
-use crate::PlatformType;
+use crate::{tag_id, PlatformType};
 use std::io::Write;
 
 /// Root type used to initialize a streaming NBT writer.
@@ -46,7 +46,7 @@ impl Writer {
 
         match root {
             RootType::Compound => {
-                encoder.write_id(0x0a)?;
+                encoder.write_id(tag_id::COMPOUND)?;
                 encoder.write_tag("")?;
                 stack.push(Scope::Compound);
             }
@@ -54,7 +54,7 @@ impl Writer {
                 if length < 0 {
                     return Err(ParseError::InvalidLength(length));
                 }
-                encoder.write_id(0x09)?;
+                encoder.write_id(tag_id::LIST)?;
                 encoder.write_tag("")?;
                 encoder.write_id(id)?;
                 encoder.write_int(length)?;
@@ -70,6 +70,14 @@ impl Writer {
         Ok(Writer { encoder, stack })
     }
 
+    fn writer_finished_error() -> ParseError {
+        ParseError::Other("writer is already finished".to_string())
+    }
+
+    fn invalid_end_value_error() -> ParseError {
+        ParseError::Other("TAG_End cannot be written as a value".to_string())
+    }
+
     fn pop_completed_lists(&mut self) {
         while matches!(self.stack.last(), Some(Scope::List { remaining: 0, .. })) {
             self.stack.pop();
@@ -78,23 +86,19 @@ impl Writer {
 
     fn component_id(component: &NbtComponent) -> Result<u8, ParseError> {
         let id = match component {
-            NbtComponent::End => {
-                return Err(ParseError::Other(
-                    "TAG_End cannot be written as a value".to_string(),
-                ));
-            }
-            NbtComponent::Byte(_) => 0x01,
-            NbtComponent::Short(_) => 0x02,
-            NbtComponent::Int(_) => 0x03,
-            NbtComponent::Long(_) => 0x04,
-            NbtComponent::Float(_) => 0x05,
-            NbtComponent::Double(_) => 0x06,
-            NbtComponent::ByteArray(_) => 0x07,
-            NbtComponent::String(_) => 0x08,
-            NbtComponent::List { .. } => 0x09,
-            NbtComponent::Compound => 0x0a,
-            NbtComponent::IntArray(_) => 0x0b,
-            NbtComponent::LongArray(_) => 0x0c,
+            NbtComponent::End => return Err(Self::invalid_end_value_error()),
+            NbtComponent::Byte(_) => tag_id::BYTE,
+            NbtComponent::Short(_) => tag_id::SHORT,
+            NbtComponent::Int(_) => tag_id::INT,
+            NbtComponent::Long(_) => tag_id::LONG,
+            NbtComponent::Float(_) => tag_id::FLOAT,
+            NbtComponent::Double(_) => tag_id::DOUBLE,
+            NbtComponent::ByteArray(_) => tag_id::BYTE_ARRAY,
+            NbtComponent::String(_) => tag_id::STRING,
+            NbtComponent::List { .. } => tag_id::LIST,
+            NbtComponent::Compound => tag_id::COMPOUND,
+            NbtComponent::IntArray(_) => tag_id::INT_ARRAY,
+            NbtComponent::LongArray(_) => tag_id::LONG_ARRAY,
         };
         Ok(id)
     }
@@ -129,9 +133,7 @@ impl Writer {
                 self.stack.push(Scope::Compound);
                 Ok(())
             }
-            NbtComponent::End => Err(ParseError::Other(
-                "TAG_End cannot be written as a value".to_string(),
-            )),
+            NbtComponent::End => Err(Self::invalid_end_value_error()),
         }
     }
 
@@ -146,7 +148,7 @@ impl Writer {
         let scope = self
             .stack
             .last_mut()
-            .ok_or_else(|| ParseError::Other("writer is already finished".to_string()))?;
+            .ok_or_else(Self::writer_finished_error)?;
 
         match scope {
             Scope::Compound => {
@@ -183,11 +185,11 @@ impl Writer {
         let scope = self
             .stack
             .pop()
-            .ok_or_else(|| ParseError::Other("writer is already finished".to_string()))?;
+            .ok_or_else(Self::writer_finished_error)?;
 
         match scope {
             Scope::Compound => {
-                self.encoder.write_id(0x00)?;
+                self.encoder.write_id(tag_id::END)?;
                 self.pop_completed_lists();
                 Ok(())
             }
@@ -198,15 +200,16 @@ impl Writer {
     }
 
     /// Returns whether writing has completed.
-    pub fn is_finished(&mut self) -> bool {
-        self.pop_completed_lists();
-        self.stack.is_empty()
+    pub fn is_finished(&self) -> bool {
+        !self
+            .stack
+            .iter()
+            .any(|scope| !matches!(scope, Scope::List { remaining: 0, .. }))
     }
 
     /// Flushes and validates the stream is complete.
     pub fn finish(&mut self) -> Result<(), ParseError> {
-        self.pop_completed_lists();
-        if !self.stack.is_empty() {
+        if !self.is_finished() {
             return Err(ParseError::Other(
                 "unfinished nbt document: open containers remain".to_string(),
             ));

@@ -1,9 +1,8 @@
 use crate::component::NbtComponent;
 use crate::decoder::{build, NbtDecoder};
 use crate::error::ParseError;
-use crate::reader_content::*;
 use crate::util::open_read_stream;
-use crate::PlatformType;
+use crate::{tag_id, PlatformType};
 use std::io::Read;
 
 /// Streaming NBT reader that yields flattened leaf values.
@@ -28,7 +27,7 @@ impl Reader {
     /// Creates a reader from an input stream.
     pub fn try_new(read: Box<dyn Read>, platform: PlatformType) -> Result<Reader, ParseError> {
         let decoder = build(read, platform);
-        let stack = vec![];
+        let stack = Vec::new();
         let mut reader = Reader {
             decoder,
             stack,
@@ -53,27 +52,37 @@ impl Reader {
         Reader::try_new(reader, platform)
     }
 
-    fn path(&self, tag: String) -> String {
-        let mut path = String::new();
-
-        for part in self
-            .stack
-            .iter()
-            .skip(1)
-            .map(|x| x.format())
-            .chain(std::iter::once(tag))
-        {
-            if path.is_empty() {
-                path.push_str(&part);
-            } else if part.starts_with('[') {
-                path.push_str(&part);
-            } else {
-                path.push('.');
-                path.push_str(&part);
-            }
+    fn append_path_part(path: &mut String, part: &str) {
+        if path.is_empty() || part.starts_with('[') {
+            path.push_str(part);
+            return;
         }
 
+        path.push('.');
+        path.push_str(part);
+    }
+
+    fn path(&self, tag: &str) -> String {
+        let mut path = String::new();
+
+        for content in self.stack.iter().skip(1) {
+            Self::append_path_part(&mut path, content.format());
+        }
+        Self::append_path_part(&mut path, tag);
+
         path
+    }
+
+    fn push_nested_content(&mut self, tag: String, component: &NbtComponent) {
+        match component {
+            NbtComponent::Compound => {
+                self.stack.push(Box::new(ComponentContent::new(tag)));
+            }
+            NbtComponent::List { id, length } if *length > 0 => {
+                self.stack.push(Box::new(ListContent::new(tag, *id, *length)));
+            }
+            _ => {}
+        }
     }
 
     /// Returns whether another leaf value is available.
@@ -83,18 +92,16 @@ impl Reader {
 
     fn init(&mut self) -> Result<(), ParseError> {
         let id = self.decoder.read_id()?;
-        let tag = self.decoder.read_tag()?; // root tag always be empty
+        let tag = self.decoder.read_tag()?;
         match id {
-            0x09 => {
-                // List
+            tag_id::LIST => {
                 let id = self.decoder.read_id()?;
                 let length = self.decoder.read_int()?;
                 if length > 0 {
                     self.stack.push(Box::new(ListContent::new(tag, id, length)));
                 }
             }
-            0x0a => {
-                // Component
+            tag_id::COMPOUND => {
                 self.stack.push(Box::new(ComponentContent::new(tag)));
             }
             _ => {
@@ -126,22 +133,13 @@ impl Reader {
 
             let (tag, component) = content.next(&mut *self.decoder)?;
 
-            match component {
+            match &component {
                 NbtComponent::End => {
                     self.pop_until_has_next();
                 }
-                NbtComponent::Compound => {
-                    let content = ComponentContent::new(tag);
-                    self.stack.push(Box::new(content));
-                }
-                NbtComponent::List { id, length } => {
-                    if length > 0 {
-                        let content = ListContent::new(tag, id, length);
-                        self.stack.push(Box::new(content));
-                    }
-                }
+                NbtComponent::Compound | NbtComponent::List { .. } => self.push_nested_content(tag, &component),
                 _ => {
-                    let path = self.path(tag);
+                    let path = self.path(&tag);
                     self.pop_until_has_next();
                     self.next = Some((path, component));
                     return Ok(());
@@ -160,3 +158,98 @@ impl Reader {
         }
     }
 }
+
+trait Content {
+    fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError>;
+    fn has_next(&self) -> bool;
+    fn format(&self) -> &str;
+}
+
+struct ListContent {
+    tag: String,
+    id: u8,
+    index: i32,
+    length: i32,
+}
+
+impl ListContent {
+    pub(crate) fn new(tag: String, id: u8, length: i32) -> ListContent {
+        ListContent {
+            tag,
+            id,
+            index: 0,
+            length,
+        }
+    }
+}
+
+impl Content for ListContent {
+    fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError> {
+        let component = next_by_id(self.id, decoder)?;
+        let tag = format!("[{}]", self.index);
+        self.index += 1;
+        Ok((tag, component))
+    }
+
+    fn has_next(&self) -> bool {
+        self.index < self.length
+    }
+
+    fn format(&self) -> &str {
+        &self.tag
+    }
+}
+
+struct ComponentContent {
+    tag: String,
+    has_next: bool,
+}
+
+impl ComponentContent {
+    pub(crate) fn new(tag: String) -> ComponentContent {
+        ComponentContent {
+            tag,
+            has_next: true,
+        }
+    }
+}
+impl Content for ComponentContent {
+    fn next(&mut self, decoder: &mut dyn NbtDecoder) -> Result<(String, NbtComponent), ParseError> {
+        let id = decoder.read_id()?;
+        if id == tag_id::END {
+            self.has_next = false;
+            return Ok((String::new(), NbtComponent::End));
+        }
+        let tag = decoder.read_tag()?;
+        let component: NbtComponent = next_by_id(id, decoder)?;
+        Ok((tag, component))
+    }
+
+    fn has_next(&self) -> bool {
+        self.has_next
+    }
+
+    fn format(&self) -> &str {
+        &self.tag
+    }
+}
+
+fn next_by_id(id: u8, decoder: &mut dyn NbtDecoder) -> Result<NbtComponent, ParseError> {
+    match id {
+        tag_id::END => Ok(NbtComponent::End),
+        tag_id::BYTE => Ok(decoder.read_byte()?.into()),
+        tag_id::SHORT => Ok(decoder.read_short()?.into()),
+        tag_id::INT => Ok(decoder.read_int()?.into()),
+        tag_id::LONG => Ok(decoder.read_long()?.into()),
+        tag_id::FLOAT => Ok(decoder.read_float()?.into()),
+        tag_id::DOUBLE => Ok(decoder.read_double()?.into()),
+        tag_id::BYTE_ARRAY => Ok(decoder.read_byte_array()?.into()),
+        tag_id::STRING => Ok(decoder.read_string()?.into()),
+        tag_id::LIST => Ok((decoder.read_id()?, decoder.read_int()?).into()),
+        tag_id::COMPOUND => Ok(NbtComponent::Compound),
+        tag_id::INT_ARRAY => Ok(decoder.read_int_array()?.into()),
+        tag_id::LONG_ARRAY => Ok(decoder.read_long_array()?.into()),
+        _ => Err(ParseError::UnsupportedTagId(id)),
+    }
+}
+
