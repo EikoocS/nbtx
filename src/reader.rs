@@ -1,8 +1,8 @@
 use crate::component::NbtComponent;
-use crate::decoder::{build, Decoder};
+use crate::decoder::Decoder;
 use crate::error::ParseError;
 use crate::util::open_read_stream;
-use crate::{tag_id, PlatformType};
+use crate::{PlatformType, tag_id};
 use std::io::Read;
 
 /// Streaming NBT reader that yields flattened leaf values.
@@ -26,7 +26,7 @@ impl Reader {
 
     /// Creates a reader from an input stream.
     pub fn try_new(read: Box<dyn Read>, platform: PlatformType) -> Result<Reader, ParseError> {
-        let decoder = build(read, platform);
+        let decoder = Decoder::new(read, platform);
         let stack = Vec::new();
         let mut reader = Reader {
             decoder,

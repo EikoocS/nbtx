@@ -1,8 +1,8 @@
-use crate::cli::model::{CompressionType, NbtValue};
+use crate::cli::types::{CompressionType, NbtValue};
 use flate2::Compression as FlateCompression;
-use nbtx::decoder::{build as build_decoder, Decoder};
-use nbtx::encoder::{build as build_encoder, Encoder};
-use nbtx::{tag_id, NbtComponent, ParseError, PlatformType};
+use nbtx::decoder::Decoder;
+use nbtx::encoder::Encoder;
+use nbtx::{NbtComponent, ParseError, PlatformType, tag_id};
 use std::fs::File;
 use std::io::{BufReader, BufWriter, Read, Write};
 
@@ -139,7 +139,7 @@ fn parse_value_by_id(id: u8, decoder: &mut Decoder) -> Result<NbtValue, ParseErr
 
 pub(super) fn parse_document(path: &str, platform: PlatformType) -> Result<NbtValue, ParseError> {
     let read = open_read_stream(path)?;
-    let mut decoder = build_decoder(read, platform);
+    let mut decoder = Decoder::new(read, platform);
 
     let root_id = decoder.read_id()?;
     let _root_tag = decoder.read_tag()?;
@@ -235,7 +235,7 @@ pub(super) fn write_document(
     compression: CompressionType,
 ) -> Result<(), ParseError> {
     let write = create_write_stream(path, compression)?;
-    let mut encoder = build_encoder(write, platform);
+    let mut encoder = Encoder::new(write, platform);
 
     match value {
         NbtValue::Compound(fields) => {

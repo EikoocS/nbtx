@@ -1,5 +1,5 @@
 use crate::cli::codec::component_id;
-use crate::cli::model::{NbtValue, PathSegment};
+use crate::cli::types::{NbtValue, PathSegment};
 use nbtx::tag_id;
 
 fn parse_number_list<T>(raw: &str) -> Result<Vec<T>, String>

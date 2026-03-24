@@ -9,3 +9,4 @@ byteorder = "1"
 cesu8 = "1.1.0"
 clap = { version = "4", features = ["derive"] }
 regex = "1"
+sysinfo = "0.37"

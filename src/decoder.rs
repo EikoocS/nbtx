@@ -152,7 +152,3 @@ impl Decoder {
         Ok(values)
     }
 }
-
-pub fn build(reader: Box<dyn Read>, platform: PlatformType) -> Decoder {
-    Decoder::new(reader, platform)
-}

@@ -173,8 +173,9 @@ impl Encoder {
         self.writer().flush()?;
         Ok(())
     }
-}
 
-pub fn build(writer: Box<dyn Write>, platform: PlatformType) -> Encoder {
-    Encoder::new(writer, platform)
+    pub fn write_raw(&mut self, bytes: &[u8]) -> Result<(), ParseError> {
+        self.writer().write_all(bytes)?;
+        Ok(())
+    }
 }
