@@ -1,4 +1,4 @@
-use crate::cli::model::{NbtValue, PathSegment, PathSelector};
+use crate::cli::types::{NbtValue, PathSegment, PathSelector};
 use nbtx::tag_id;
 use regex::Regex;
 use std::collections::BTreeMap;

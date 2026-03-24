@@ -1,7 +1,7 @@
 use crate::component::NbtComponent;
-use crate::encoder::{build, Encoder};
+use crate::encoder::Encoder;
 use crate::error::ParseError;
-use crate::{tag_id, PlatformType};
+use crate::{PlatformType, tag_id};
 use std::io::Write;
 
 /// Root type used to initialize a streaming NBT writer.
@@ -41,7 +41,7 @@ impl Writer {
         platform: PlatformType,
         root: RootType,
     ) -> Result<Writer, ParseError> {
-        let mut encoder = build(write, platform);
+        let mut encoder = Encoder::new(write, platform);
         let mut stack = Vec::new();
 
         match root {

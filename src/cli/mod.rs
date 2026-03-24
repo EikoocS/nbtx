@@ -1,9 +1,10 @@
 mod args;
 mod codec;
-mod model;
 mod path;
+mod stream_edit;
 #[cfg(test)]
 mod tests;
+mod types;
 mod values;
 mod where_expr;
 
@@ -12,7 +13,6 @@ use clap::Parser;
 use codec::{
     detect_compression, format_component, is_descendant_path, parse_document, write_document,
 };
-use model::{CompressionType, NbtValue};
 use nbtx::{PlatformType, Reader, tag_id};
 use path::{
     delete_paths, find_mut, normalize_delete_paths, parse_path, parse_path_selector,
@@ -20,6 +20,8 @@ use path::{
 };
 use std::io::{Error, ErrorKind};
 use std::path::Path;
+use stream_edit::{prefer_full_tree_edit, run_create_stream, run_delete_stream, run_set_stream};
+use types::{CompressionType, NbtValue};
 use values::{create_at_path, parse_value_for_create, parse_value_like};
 use where_expr::{parse_where_expr, resolve_list_targets_for_where, where_matches_all};
 
@@ -57,6 +59,27 @@ fn run_read(args: &Args, platform: PlatformType) -> std::io::Result<()> {
     ))
 }
 
+fn run_set(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::Result<()> {
+    if prefer_full_tree_edit(&args.file)? {
+        return run_set_tree(args, raw_value, platform);
+    }
+    run_set_stream(args, raw_value, platform)
+}
+
+fn run_create(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::Result<()> {
+    if prefer_full_tree_edit(&args.file)? {
+        return run_create_tree(args, raw_value, platform);
+    }
+    run_create_stream(args, raw_value, platform)
+}
+
+fn run_delete(args: &Args, platform: PlatformType) -> std::io::Result<()> {
+    if prefer_full_tree_edit(&args.file)? {
+        return run_delete_tree(args, platform);
+    }
+    run_delete_stream(args, platform)
+}
+
 fn load_document(
     args: &Args,
     platform: PlatformType,
@@ -67,7 +90,7 @@ fn load_document(
     Ok((compression, document))
 }
 
-fn run_set(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::Result<()> {
+fn run_set_tree(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::Result<()> {
     let (compression, mut document) = load_document(args, platform)?;
 
     let selector = parse_path_selector(&args.path)
@@ -96,7 +119,7 @@ fn run_set(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::Res
     persist_document(args, &document, platform, compression)
 }
 
-fn run_create(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::Result<()> {
+fn run_create_tree(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::Result<()> {
     if args.path.starts_with("re:") {
         return Err(Error::new(
             ErrorKind::InvalidInput,
@@ -116,7 +139,7 @@ fn run_create(args: &Args, raw_value: &str, platform: PlatformType) -> std::io::
     persist_document(args, &document, platform, compression)
 }
 
-fn run_delete(args: &Args, platform: PlatformType) -> std::io::Result<()> {
+fn run_delete_tree(args: &Args, platform: PlatformType) -> std::io::Result<()> {
     let (compression, mut document) = load_document(args, platform)?;
 
     let selector = parse_path_selector(&args.path)

@@ -1,6 +1,7 @@
 use nbtx::{NbtComponent, PlatformType, Reader, RootType, Writer, tag_id};
 use std::collections::BTreeMap;
 use std::fs::File;
+use std::io::Read;
 use std::path::PathBuf;
 use std::process::Command;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -68,6 +69,45 @@ fn write_sample_file(path: &PathBuf) {
 
     writer.end().expect("failed to end root");
     writer.finish().expect("failed to finish writer");
+}
+
+fn write_sample_gzip_file(path: &PathBuf) {
+    let file = File::create(path).expect("failed to create sample gzip nbt file");
+    let gz = flate2::write::GzEncoder::new(file, flate2::Compression::default());
+    let mut writer = Writer::new(Box::new(gz), PlatformType::JavaEdition, RootType::Compound);
+
+    writer
+        .write("value", NbtComponent::Int(7))
+        .expect("failed to write value");
+    writer.end().expect("failed to end root");
+    writer.finish().expect("failed to finish writer");
+}
+
+fn read_magic(path: &PathBuf) -> [u8; 2] {
+    let mut file = File::open(path).expect("failed to open file");
+    let mut buf = [0u8; 2];
+    file.read_exact(&mut buf).expect("failed to read magic");
+    buf
+}
+
+fn read_int_at(path: &PathBuf, target_path: &str) -> i32 {
+    let mut reader = Reader::try_new_with_path(
+        path.to_str().expect("temp path should be valid utf8"),
+        PlatformType::JavaEdition,
+    )
+    .expect("failed to read nbt file");
+
+    while reader.has_next() {
+        let (entry_path, component) = reader.next().expect("failed to read nbt entry");
+        if entry_path == target_path {
+            if let NbtComponent::Int(value) = component {
+                return value;
+            }
+            panic!("target path is not an int: {target_path}");
+        }
+    }
+
+    panic!("target path not found: {target_path}");
 }
 
 fn read_item_pairs(path: &PathBuf) -> Vec<(i32, i32)> {
@@ -187,6 +227,42 @@ fn delete_where_on_list_path_does_not_remove_list_container() {
     assert_eq!(pairs.len(), 2);
     assert!(pairs.contains(&(123, 1000)));
     assert!(pairs.contains(&(456, 1)));
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn set_on_gzip_keeps_gzip_compression() {
+    let path = unique_temp_file("set_gzip");
+    write_sample_gzip_file(&path);
+
+    run_cli(&[
+        path.to_str().expect("temp path should be valid utf8"),
+        "value",
+        "--set",
+        "99",
+    ]);
+
+    let magic = read_magic(&path);
+    assert_eq!(magic, [0x1F, 0x8B]);
+    assert_eq!(read_int_at(&path, "value"), 99);
+
+    let _ = std::fs::remove_file(path);
+}
+
+#[test]
+fn create_adds_new_value_with_stream_pipeline() {
+    let path = unique_temp_file("create_stream");
+    write_sample_file(&path);
+
+    run_cli(&[
+        path.to_str().expect("temp path should be valid utf8"),
+        "extra.score",
+        "--create",
+        "int:321",
+    ]);
+
+    assert_eq!(read_int_at(&path, "extra.score"), 321);
 
     let _ = std::fs::remove_file(path);
 }

@@ -1,5 +1,5 @@
-use crate::cli::model::{NbtValue, PathSegment, WhereClause, WhereOp, WhereValue};
 use crate::cli::path::find_ref;
+use crate::cli::types::{NbtValue, PathSegment, WhereClause, WhereOp, WhereValue};
 use regex::Regex;
 
 fn parse_where_value(raw: &str) -> WhereValue {

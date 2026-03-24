@@ -1,4 +1,9 @@
-use super::*;
+use crate::cli::path::{
+    normalize_delete_paths, parse_path, parse_path_selector, resolve_selector_paths,
+};
+use crate::cli::types::NbtValue;
+use crate::cli::where_expr::{parse_where_expr, resolve_list_targets_for_where, where_matches_all};
+use nbtx::tag_id;
 
 fn sample_list_of_compounds() -> NbtValue {
     NbtValue::List {
